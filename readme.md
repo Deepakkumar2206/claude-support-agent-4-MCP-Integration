@@ -1,100 +1,46 @@
-# Customer Support Agent - Stage 2
+# Customer Support Agent - MCP Integration
 
-A Python-based AI Customer Support Agent built using the Anthropic Claude API. This project demonstrates tool calling, structured error handling, detailed tool descriptions, and customer/order lookup workflows.
+This project is an upgraded version of my Customer Support Agent built using the Anthropic Claude API. In the previous stages, the tools were directly connected to the agent. In this stage, I moved those tools into an MCP (Model Context Protocol) server so they can be reused and managed separately.
 
-## Overview
+The agent can:
 
-This agent can:
-
-* Look up customer records using name, email, or customer ID.
-* Look up order information using order ID.
-* Use Claude's tool-calling capabilities to retrieve data.
-* Return structured validation errors when records are not found.
-* Provide helpful and user-friendly support responses.
-
-This project was built as part of the Claude Certified Architect preparation track.
+* Look up customer details
+* Look up order information
+* Process refunds
+* Verify customers before refunds
+* Access tools through an MCP Server
 
 ---
 
-## Features
+## What I Learned
 
-### Customer Lookup Tool
+Before this project, all tools were defined inside the application itself. This works for small projects, but becomes difficult to maintain when multiple agents need the same tools.
 
-Search customers using:
+With MCP, tools can be exposed through a separate server and shared across different applications without duplicating code.
 
-* Customer ID (Example: `CUST-4492`)
-* Email Address (Example: `sarah.chen@email.com`)
-* Full Name (Example: `Sarah Chen`)
+I also learned:
 
-Returns:
-
-* Customer ID
-* Name
-* Email
-* Account Status
-* Membership Date
-* Total Orders
-* Associated Order IDs
-
----
-
-### Order Lookup Tool
-
-Search orders using:
-
-* Order ID (Example: `ORD-8821`)
-
-Returns:
-
-* Order Status
-* Items Purchased
-* Order Date
-* Shipping Information
-* Tracking Details
-* Internal Notes
-
----
-
-### Structured Error Handling
-
-Instead of returning generic messages like:
-
-```json
-{
-  "error": "Something went wrong"
-}
-```
-
-The agent returns structured errors:
-
-```json
-{
-  "error": {
-    "type": "validation",
-    "retryable": false,
-    "message": "No order found with ID 'ORD-9999'."
-  }
-}
-```
-
-Benefits:
-
-* Easier for Claude to reason about failures.
-* Better user experience.
-* Reduced context window usage.
-* More reliable production behavior.
+* What MCP (Model Context Protocol) is
+* How MCP Servers work
+* How to expose Python functions as MCP tools
+* How to configure MCP using `mcp.json`
+* How to test tools using MCP Inspector
+* Why environment variables should be used instead of hardcoded secrets
 
 ---
 
 ## Project Structure
 
 ```text
-customer-agent-stage2/
-│
+customer-support-agent/
+
 ├── agent.py
 ├── tools.py
 ├── tool_runner.py
 ├── mock_data.py
+├── mcp_server.py
+├── .claude/
+│   └── mcp.json
 ├── .env
 ├── .gitignore
 └── README.md
@@ -102,122 +48,99 @@ customer-agent-stage2/
 
 ---
 
+## Creating the MCP Server
+
+I created an MCP server using FastMCP.
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("support-agent-tools")
+```
+
+This creates an MCP server named `support-agent-tools`.
+
+---
+
+## Exposing Existing Tools
+
+The existing customer support functions were converted into MCP tools.
+
+```python
+@mcp.tool()
+def get_customer_tool(query: str):
+    return get_customer(query, session_state)
+```
+
+Now the tool can be discovered and called through MCP.
+
+---
+
+## MCP Configuration
+
+```json
+{
+  "mcpServers": {
+    "support-agent-tools": {
+      "command": "python",
+      "args": ["mcp_server.py"]
+    }
+  }
+}
+```
+
+This configuration tells Claude how to start and connect to the MCP server.
+
+---
+
+## Testing with MCP Inspector
+
+I used MCP Inspector to verify that the server was running correctly and exposing the tools.
+
+```bash
+mcp dev mcp_server.py
+```
+
+Using MCP Inspector, I was able to:
+
+* Connect to the server
+* View available tools
+* Test tool execution
+* Verify responses
+
+---
+
+## Available MCP Tools
+
+### get_customer_tool
+
+Find customer details using:
+
+* Customer ID
+* Email Address
+* Full Name
+
+### lookup_order_tool
+
+Retrieve order information using an Order ID.
+
+### process_refund_tool
+
+Process refunds after customer verification checks pass.
+
+---
+
 ## Technologies Used
 
-* Python 3
+* Python
 * Anthropic Claude API
+* MCP Python SDK
+* FastMCP
+* MCP Inspector
 * python-dotenv
-* JSON
-* Tool Calling
-
----
-
-## Installation
-
-### Clone Repository
-
-```bash
-git clone https://github.com/Deepakkumar2206/customer-agent-stage2.git
-cd customer-agent-stage2
-```
-
-### Install Dependencies
-
-```bash
-pip install anthropic python-dotenv
-```
-
-### Create Environment File
-
-Create a `.env` file:
-
-```env
-ANTHROPIC_API_KEY=your_api_key_here
-```
-
----
-
-## Run the Agent
-
-```bash
-python agent.py
-```
-
----
-
-## Example Conversation
-
-### Customer Lookup
-
-```text
-Customer: Sarah Chen
-```
-
-Agent retrieves:
-
-```text
-Customer ID: CUST-4492
-Email: sarah.chen@email.com
-Status: Active
-```
-
----
-
-### Order Lookup
-
-```text
-Customer: Check order ORD-8821
-```
-
-Agent retrieves:
-
-```text
-Status: Processing
-Days Since Order: 6
-Note: Warehouse inventory hold.
-```
-
----
-
-### Validation Error Example
-
-```text
-Customer: Check order ORD-9999
-```
-
-Agent response:
-
-```text
-No order found with ID 'ORD-9999'.
-Please verify the order number and try again.
-```
-
----
-
-## Learning Outcomes
-
-This project demonstrates:
-
-* Claude Tool Calling
-* Multi-tool Agent Workflows
-* Structured Error Design
-* Tool Description Engineering
-* JSON Tool Responses
-* Customer Support Agent Design
-* AI Agent Reliability Best Practices
 
 ---
 
 ## Author
 
 Deepakkumar
-
-* Blockchain & Web3 Developer
-* Smart Contract Engineer
-* AI Agent Builder
-
-GitHub:
-https://github.com/Deepakkumar2206
-
-```
-```
